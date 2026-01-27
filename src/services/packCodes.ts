@@ -209,8 +209,8 @@ export async function getPackCodesByCreator(createdBy: string): Promise<PackCode
 
 export interface RedeemResult {
   packCode: PackCode;
-  allCards: OwnedCard[];
-  packs: OwnedCard[][];
+  packsAdded: number;
+  newPackBalance: number;
 }
 
 export async function redeemPackCode(
@@ -256,85 +256,31 @@ export async function redeemPackCode(
       expiresAt: packCodeRow.expires_at,
     };
 
-    const [players, seasonInfo] = await Promise.all([
-      fetchPlayersWithStats(),
-      getSeasonAndMatchType(),
-    ]);
-
-    const eligiblePlayers = players.filter((p) => p.stats && p.stats.gameCount > 0);
-    if (eligiblePlayers.length === 0) {
-      throw new Error('No eligible players available');
-    }
-
-    const allCards: OwnedCard[] = [];
-    const packs: OwnedCard[][] = [];
-
-    for (let packIndex = 0; packIndex < packCode.packCount; packIndex++) {
-      const packCards: OwnedCard[] = [];
-      const guarantees = packCode.guaranteedRarities || {};
-      
-      const guaranteedSlots: CardRarity[] = [];
-      if (guarantees.prismatic) {
-        for (let i = 0; i < guarantees.prismatic; i++) guaranteedSlots.push('prismatic');
-      }
-      if (guarantees.gold) {
-        for (let i = 0; i < guarantees.gold; i++) guaranteedSlots.push('gold');
-      }
-      if (guarantees.holo) {
-        for (let i = 0; i < guarantees.holo; i++) guaranteedSlots.push('holo');
-      }
-      if (guarantees.foil) {
-        for (let i = 0; i < guarantees.foil; i++) guaranteedSlots.push('foil');
-      }
-
-      for (let cardIndex = 0; cardIndex < packCode.cardsPerPack; cardIndex++) {
-        const randomPlayer = eligiblePlayers[Math.floor(Math.random() * eligiblePlayers.length)];
-        
-        let rarity: CardRarity;
-        if (cardIndex < guaranteedSlots.length) {
-          rarity = guaranteedSlots[cardIndex];
-        } else {
-          rarity = rollRarity();
-        }
-
-        const snapshot = await findOrCreateSnapshot(
-          connection,
-          randomPlayer,
-          seasonInfo.season,
-          seasonInfo.matchType
-        );
-
-        const cardId = uuidv4();
-        await connection.query(
-          `INSERT INTO owned_cards (id, discord_user_id, card_snapshot_id, rarity)
-           VALUES (?, ?, ?, ?)`,
-          [cardId, discordUserId, snapshot.id, rarity]
-        );
-
-        const ownedCard: OwnedCard = {
-          id: cardId,
-          discordUserId,
-          cardSnapshotId: snapshot.id,
-          rarity,
-          obtainedAt: new Date(),
-          snapshot,
-        };
-
-        packCards.push(ownedCard);
-        allCards.push(ownedCard);
-      }
-
-      packs.push(packCards);
-    }
-
+    // Add packs to user's balance instead of opening them
     await connection.query(
-      'UPDATE pack_codes SET redeemed_by = ?, redeemed_at = NOW() WHERE code = ?',
+      'UPDATE users SET pack_balance = pack_balance + ? WHERE discord_id = ?',
+      [packCode.packCount, discordUserId]
+    );
+
+    // Mark code as redeemed
+    await connection.query(
+      'UPDATE pack_codes SET redeemed_by = ?, redeemed_at = CURRENT_TIMESTAMP WHERE code = ?',
       [discordUserId, code]
+    );
+
+    // Get new balance
+    const balanceResult = await connection.query(
+      'SELECT pack_balance FROM users WHERE discord_id = ?',
+      [discordUserId]
     );
 
     await connection.commit();
 
-    return { packCode, allCards, packs };
+    return { 
+      packCode, 
+      packsAdded: packCode.packCount,
+      newPackBalance: balanceResult.rows[0]?.pack_balance || 0,
+    };
   } catch (error) {
     await connection.rollback();
     throw error;

@@ -9,13 +9,21 @@ interface SeasonConfig {
   hasSeasonStarted: boolean;
 }
 
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 let cachedSeason: SeasonConfig | null = null;
 let seasonCacheTime = 0;
-const SEASON_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+let cachedPlayers: CscPlayer[] | null = null;
+let playersCacheTime = 0;
+
+let cachedStats: Map<string, PlayerStats> | null = null;
+let statsCacheTime = 0;
+let statsCacheKey = '';
 
 export async function fetchCurrentSeason(): Promise<SeasonConfig> {
   const now = Date.now();
-  if (cachedSeason && now - seasonCacheTime < SEASON_CACHE_DURATION) {
+  if (cachedSeason && now - seasonCacheTime < CACHE_DURATION) {
     return cachedSeason;
   }
 
@@ -27,6 +35,10 @@ export async function fetchCurrentSeason(): Promise<SeasonConfig> {
 }
 
 export async function fetchPlayers(): Promise<CscPlayer[]> {
+  const now = Date.now();
+  if (cachedPlayers && now - playersCacheTime < CACHE_DURATION) {
+    return cachedPlayers;
+  }
   const response = await fetch(CSC_CORE_GRAPHQL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -57,7 +69,10 @@ export async function fetchPlayers(): Promise<CscPlayer[]> {
   });
 
   const json = (await response.json()) as { data?: { players?: CscPlayer[] } };
-  return json.data?.players ?? [];
+  const players = json.data?.players ?? [];
+  cachedPlayers = players;
+  playersCacheTime = now;
+  return players;
 }
 
 export async function fetchTierStats(
@@ -97,6 +112,13 @@ export async function fetchAllStats(
   season: number,
   matchType: string
 ): Promise<Map<string, PlayerStats>> {
+  const now = Date.now();
+  const cacheKey = `${season}-${matchType}`;
+  
+  if (cachedStats && statsCacheKey === cacheKey && now - statsCacheTime < CACHE_DURATION) {
+    return cachedStats;
+  }
+
   const tiers = ['Recruit', 'Prospect', 'Contender', 'Challenger', 'Elite', 'Premier'];
   const statsMap = new Map<string, PlayerStats>();
 
@@ -110,6 +132,9 @@ export async function fetchAllStats(
     }
   });
 
+  cachedStats = statsMap;
+  statsCacheTime = now;
+  statsCacheKey = cacheKey;
   return statsMap;
 }
 

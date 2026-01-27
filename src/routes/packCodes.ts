@@ -164,12 +164,9 @@ router.post('/redeem', authenticateToken, async (req: Request, res: Response) =>
     const result = await redeemPackCode(code, req.user!.discordId);
 
     res.json({
-      message: `Successfully redeemed ${result.packCode.packCount} pack(s) with ${result.allCards.length} total cards!`,
-      packCount: result.packCode.packCount,
-      cardsPerPack: result.packCode.cardsPerPack,
-      totalCards: result.allCards.length,
-      packs: result.packs,
-      allCards: result.allCards,
+      message: `Successfully redeemed ${result.packsAdded} pack(s)! You now have ${result.newPackBalance} packs to open.`,
+      packsAdded: result.packsAdded,
+      packBalance: result.newPackBalance,
     });
   } catch (error: any) {
     console.error('Error redeeming pack code:', error);

@@ -101,6 +101,7 @@ export class PostgresAdapter implements DatabaseAdapter {
           discord_id VARCHAR(32) PRIMARY KEY,
           username VARCHAR(100) NOT NULL,
           avatar VARCHAR(255),
+          pack_balance INT NOT NULL DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

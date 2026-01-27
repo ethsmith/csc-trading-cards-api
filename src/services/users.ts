@@ -4,6 +4,7 @@ export interface User {
   discordId: string;
   username: string;
   avatar: string | null;
+  packBalance: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,7 @@ export async function findOrCreateUser(
         discordId: existing.rows[0].discord_id,
         username,
         avatar,
+        packBalance: existing.rows[0].pack_balance || 0,
         createdAt: existing.rows[0].created_at,
         updatedAt: new Date(),
       };
@@ -47,6 +49,7 @@ export async function findOrCreateUser(
       discordId,
       username,
       avatar,
+      packBalance: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -69,6 +72,7 @@ export async function getUserByDiscordId(discordId: string): Promise<User | null
     discordId: row.discord_id,
     username: row.username,
     avatar: row.avatar,
+    packBalance: row.pack_balance || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -85,7 +89,35 @@ export async function searchUsers(query: string, limit: number = 20): Promise<Us
     discordId: row.discord_id,
     username: row.username,
     avatar: row.avatar,
+    packBalance: row.pack_balance || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+}
+
+export async function getPackBalance(discordId: string): Promise<number> {
+  const db = getDatabase();
+  const result = await db.query(
+    'SELECT pack_balance FROM users WHERE discord_id = ?',
+    [discordId]
+  );
+  return result.rows[0]?.pack_balance || 0;
+}
+
+export async function addPacks(discordId: string, count: number): Promise<number> {
+  const db = getDatabase();
+  await db.query(
+    'UPDATE users SET pack_balance = pack_balance + ? WHERE discord_id = ?',
+    [count, discordId]
+  );
+  return getPackBalance(discordId);
+}
+
+export async function decrementPackBalance(discordId: string): Promise<boolean> {
+  const db = getDatabase();
+  const result = await db.query(
+    'UPDATE users SET pack_balance = pack_balance - 1 WHERE discord_id = ? AND pack_balance > 0',
+    [discordId]
+  );
+  return result.rowCount > 0;
 }

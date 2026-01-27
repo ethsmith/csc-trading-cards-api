@@ -7,31 +7,25 @@ class SQLiteTransaction implements DatabaseTransaction {
   constructor(private db: Database.Database) {}
 
   async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {
-    const convertedSql = this.convertPlaceholders(sql);
+    let convertedSql = this.convertPlaceholders(sql);
+    convertedSql = convertedSql.replace(/\s+FOR\s+UPDATE/gi, '');
+    
     const convertedParams = this.convertBooleans(params || []);
     
-    try {
-      if (this.isSelectQuery(convertedSql)) {
-        const stmt = this.db.prepare(convertedSql);
-        const rows = stmt.all(...convertedParams) as T[];
-        return {
-          rows,
-          rowCount: rows.length,
-        };
-      } else {
-        const stmt = this.db.prepare(convertedSql);
-        const result = stmt.run(...convertedParams);
-        return {
-          rows: [] as T[],
-          rowCount: result.changes,
-        };
-      }
-    } catch (error: any) {
-      if (error.message?.includes('FOR UPDATE')) {
-        const cleanSql = convertedSql.replace(/\s+FOR\s+UPDATE/gi, '');
-        return this.query(cleanSql, params);
-      }
-      throw error;
+    if (this.isSelectQuery(convertedSql)) {
+      const stmt = this.db.prepare(convertedSql);
+      const rows = stmt.all(...convertedParams) as T[];
+      return {
+        rows,
+        rowCount: rows.length,
+      };
+    } else {
+      const stmt = this.db.prepare(convertedSql);
+      const result = stmt.run(...convertedParams);
+      return {
+        rows: [] as T[],
+        rowCount: result.changes,
+      };
     }
   }
 
@@ -108,6 +102,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         discord_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
         avatar TEXT,
+        pack_balance INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       )
