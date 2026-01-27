@@ -1,4 +1,5 @@
 import { getDatabase } from '../config/database';
+import { grantDailyGiftIfNeeded, grantEarlyArrivalGiftIfEligible } from './gifts';
 
 export interface User {
   discordId: string;
@@ -30,6 +31,11 @@ export async function findOrCreateUser(
         [username, avatar, discordId]
       );
 
+      connection.release();
+
+      // Grant daily gift if not already received today
+      await grantDailyGiftIfNeeded(discordId);
+
       return {
         discordId: existing.rows[0].discord_id,
         username,
@@ -46,6 +52,11 @@ export async function findOrCreateUser(
       [discordId, username, avatar, initialPackBalance]
     );
 
+    connection.release();
+
+    // Grant Early Arrival gift for new users before 02/01/2026
+    await grantEarlyArrivalGiftIfEligible(discordId);
+
     return {
       discordId,
       username,
@@ -55,7 +66,7 @@ export async function findOrCreateUser(
       updatedAt: new Date(),
     };
   } finally {
-    connection.release();
+    // Connection may already be released
   }
 }
 
