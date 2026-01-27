@@ -36,6 +36,9 @@ export async function findOrCreateUser(
       // Grant daily gift if not already received today
       await grantDailyGiftIfNeeded(discordId);
 
+      // Grant Early Arrival gift for existing users who haven't received it yet (before 02/01/2026)
+      await grantEarlyArrivalGiftIfEligible(discordId);
+
       return {
         discordId: existing.rows[0].discord_id,
         username,
