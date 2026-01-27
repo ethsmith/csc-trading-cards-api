@@ -175,7 +175,7 @@ export async function openPack(
 
       cards.push(ownedCard);
       
-      if (snapshot.createdAt.getTime() > Date.now() - 1000) {
+      if (new Date(snapshot.createdAt).getTime() > Date.now() - 1000) {
         newSnapshots.push(snapshot);
       }
     }
