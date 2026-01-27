@@ -9,7 +9,7 @@ interface SeasonConfig {
   hasSeasonStarted: boolean;
 }
 
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
 
 let cachedSeason: SeasonConfig | null = null;
 let seasonCacheTime = 0;
@@ -145,14 +145,28 @@ export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
   ]);
 
   const matchType = seasonConfig.hasSeasonStarted ? 'Regulation' : 'Combine';
-  const statsMap = await fetchAllStats(seasonConfig.number, matchType);
+  let statsMap = await fetchAllStats(seasonConfig.number, matchType);
 
-  return players
+  console.log(`[CSC] Season ${seasonConfig.number}, matchType: ${matchType}, players: ${players.length}, stats entries: ${statsMap.size}`);
+
+  // Fall back to Combine stats if Regulation has no stats
+  if (statsMap.size === 0 && matchType === 'Regulation') {
+    console.log(`[CSC] No Regulation stats found, falling back to Combine`);
+    statsMap = await fetchAllStats(seasonConfig.number, 'Combine');
+    console.log(`[CSC] Combine stats entries: ${statsMap.size}`);
+  }
+
+  const result = players
     .filter((player) => player.tier?.name)
     .map((player) => ({
       ...player,
       stats: statsMap.get(player.name),
     }));
+
+  const withStats = result.filter(p => p.stats && p.stats.gameCount > 0);
+  console.log(`[CSC] Players with tier: ${result.length}, with stats & games: ${withStats.length}`);
+
+  return result;
 }
 
 export async function getSeasonAndMatchType(): Promise<{ season: number; matchType: 'Regulation' | 'Combine' }> {
