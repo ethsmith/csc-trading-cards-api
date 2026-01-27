@@ -213,12 +213,13 @@ export async function acceptTradeOffer(
     // Cancel any other pending trades involving these cards
     const cardIds = cardResult.rows.map((r: any) => r.owned_card_id);
     if (cardIds.length > 0) {
+      const placeholders = cardIds.map(() => '?').join(', ');
       await connection.query(
         `UPDATE trade_offers SET status = 'cancelled' 
          WHERE id != ? AND status = 'pending' AND id IN (
-           SELECT trade_offer_id FROM trade_offer_cards WHERE owned_card_id IN (?)
+           SELECT trade_offer_id FROM trade_offer_cards WHERE owned_card_id IN (${placeholders})
          )`,
-        [tradeId, cardIds]
+        [tradeId, ...cardIds]
       );
     }
 
