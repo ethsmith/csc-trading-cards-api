@@ -40,16 +40,17 @@ export async function findOrCreateUser(
       };
     }
 
+    const initialPackBalance = 10;
     await connection.query(
-      'INSERT INTO users (discord_id, username, avatar) VALUES (?, ?, ?)',
-      [discordId, username, avatar]
+      'INSERT INTO users (discord_id, username, avatar, pack_balance) VALUES (?, ?, ?, ?)',
+      [discordId, username, avatar, initialPackBalance]
     );
 
     return {
       discordId,
       username,
       avatar,
-      packBalance: 0,
+      packBalance: initialPackBalance,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
