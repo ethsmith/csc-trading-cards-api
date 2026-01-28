@@ -21,6 +21,9 @@ let cachedStats: Map<string, PlayerStats> | null = null;
 let statsCacheTime = 0;
 let statsCacheKey = '';
 
+let cachedPlayersWithStats: PlayerWithStats[] | null = null;
+let playersWithStatsCacheTime = 0;
+
 export async function fetchCurrentSeason(): Promise<SeasonConfig> {
   const now = Date.now();
   if (cachedSeason && now - seasonCacheTime < CACHE_DURATION) {
@@ -139,6 +142,13 @@ export async function fetchAllStats(
 }
 
 export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
+  const now = Date.now();
+  
+  // Return cached result if valid
+  if (cachedPlayersWithStats && now - playersWithStatsCacheTime < CACHE_DURATION) {
+    return cachedPlayersWithStats;
+  }
+
   const [players, seasonConfig] = await Promise.all([
     fetchPlayers(),
     fetchCurrentSeason(),
@@ -165,6 +175,12 @@ export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
 
   const withStats = result.filter(p => p.stats && p.stats.gameCount > 0);
   console.log(`[CSC] Players with tier: ${result.length}, with stats & games: ${withStats.length}`);
+
+  // Only cache if we got good results
+  if (withStats.length >= 600) {
+    cachedPlayersWithStats = result;
+    playersWithStatsCacheTime = now;
+  }
 
   return result;
 }
