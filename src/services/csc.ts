@@ -152,15 +152,17 @@ export async function fetchAllStats(
   const tiers = ['Recruit', 'Prospect', 'Contender', 'Challenger', 'Elite', 'Premier'];
   const statsMap = new Map<string, PlayerStats>();
 
-  const results = await Promise.all(
-    tiers.map((tier) => fetchTierStats(tier, season, matchType))
-  );
-
-  results.flat().forEach((stat) => {
-    if (stat.name) {
-      statsMap.set(stat.name, stat);
-    }
-  });
+  // Fetch sequentially with small delay to avoid rate limiting
+  for (const tier of tiers) {
+    const tierStats = await fetchTierStats(tier, season, matchType);
+    tierStats.forEach((stat) => {
+      if (stat.name) {
+        statsMap.set(stat.name, stat);
+      }
+    });
+    // Small delay between requests to avoid throttling
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
   cachedStats = statsMap;
   statsCacheTime = now;
