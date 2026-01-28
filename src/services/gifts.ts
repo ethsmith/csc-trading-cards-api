@@ -235,7 +235,7 @@ export async function grantDailyGiftIfNeeded(discordUserId: string): Promise<boo
     }
   }
 
-  await createGiftForUser(discordUserId, 'Daily Login Bonus', 3);
+  await createGiftForUser(discordUserId, 'Daily Login Bonus', 10);
   return true;
 }
 
