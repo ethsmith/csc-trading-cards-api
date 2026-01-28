@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase, DatabaseTransaction } from '../config/database';
 import { PackCode, GuaranteedRarities, OwnedCard, CardRarity, CardSnapshot, RARITY_WEIGHTS, PlayerWithStats, StatType } from '../types';
-import { fetchPlayersWithStats, getSeasonAndMatchType } from './csc';
+import { getPlayersWithStats, getSeasonAndMatchType } from './csc';
 
 async function findOrCreateSnapshot(
   connection: DatabaseTransaction,

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase, DatabaseTransaction } from '../config/database';
 import { CardSnapshot, OwnedCard, CardRarity, RARITY_WEIGHTS, PlayerWithStats, StatType } from '../types';
-import { fetchPlayersWithStats, getSeasonAndMatchType } from './csc';
+import { getPlayersWithStats, getSeasonAndMatchType } from './csc';
 
 function rollRarity(): CardRarity {
   const totalWeight = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
@@ -128,10 +128,8 @@ export async function openPack(
   discordUserId: string,
   packSize: number = 5
 ): Promise<{ cards: OwnedCard[]; newSnapshots: CardSnapshot[] }> {
-  const [players, seasonInfo] = await Promise.all([
-    fetchPlayersWithStats(),
-    getSeasonAndMatchType(),
-  ]);
+  const players = getPlayersWithStats();
+  const seasonInfo = await getSeasonAndMatchType();
 
   const eligiblePlayers = players.filter((p) => p.stats && p.stats.gameCount > 0);
   if (eligiblePlayers.length === 0) {

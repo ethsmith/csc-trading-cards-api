@@ -9,7 +9,7 @@ interface SeasonConfig {
   hasSeasonStarted: boolean;
 }
 
-const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
+export const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
 
 let cachedSeason: SeasonConfig | null = null;
 let seasonCacheTime = 0;
@@ -17,9 +17,6 @@ let seasonCacheTime = 0;
 // Cache player details by name for quick lookup
 let cachedPlayerDetails: Map<string, CscPlayer> = new Map();
 
-let cachedStats: Map<string, PlayerStats> | null = null;
-let statsCacheTime = 0;
-let statsCacheKey = '';
 
 let cachedPlayersWithStats: PlayerWithStats[] | null = null;
 let playersWithStatsCacheTime = 0;
@@ -138,17 +135,10 @@ export async function fetchTierStats(
   return json.data?.tierSeasonStats ?? [];
 }
 
-export async function fetchAllStats(
+async function fetchAllStats(
   season: number,
   matchType: string
 ): Promise<Map<string, PlayerStats>> {
-  const now = Date.now();
-  const cacheKey = `${season}-${matchType}`;
-  
-  if (cachedStats && statsCacheKey === cacheKey && now - statsCacheTime < CACHE_DURATION) {
-    return cachedStats;
-  }
-
   const tiers = ['Recruit', 'Prospect', 'Contender', 'Challenger', 'Elite', 'Premier'];
   const statsMap = new Map<string, PlayerStats>();
 
@@ -164,20 +154,16 @@ export async function fetchAllStats(
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  cachedStats = statsMap;
-  statsCacheTime = now;
-  statsCacheKey = cacheKey;
   return statsMap;
 }
 
-export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
-  const now = Date.now();
-  
-  // Return cached result if valid
-  if (cachedPlayersWithStats && now - playersWithStatsCacheTime < CACHE_DURATION) {
-    return cachedPlayersWithStats;
-  }
+// Returns cached players - does NOT fetch. Use refreshCache() to update.
+export function getPlayersWithStats(): PlayerWithStats[] {
+  return cachedPlayersWithStats || [];
+}
 
+// Internal function to actually fetch and update cache
+async function fetchAndCachePlayersWithStats(): Promise<PlayerWithStats[]> {
   // Step 1: Get season config and stats FIRST (this tells us who has played)
   const seasonConfig = await fetchCurrentSeason();
   const matchType = seasonConfig.hasSeasonStarted ? 'Regulation' : 'Combine';
@@ -221,7 +207,7 @@ export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
   const currentCacheSize = cachedPlayersWithStats?.length || 0;
   if (result.length >= 600 || result.length > currentCacheSize) {
     cachedPlayersWithStats = result;
-    playersWithStatsCacheTime = now;
+    playersWithStatsCacheTime = Date.now();
     console.log(`[CSC] Cached ${result.length} players with stats`);
   } else if (cachedPlayersWithStats) {
     console.log(`[CSC] Keeping existing cache (${currentCacheSize}) over new result (${result.length})`);
@@ -237,4 +223,25 @@ export async function getSeasonAndMatchType(): Promise<{ season: number; matchTy
     season: config.number,
     matchType: config.hasSeasonStarted ? 'Regulation' : 'Combine',
   };
+}
+
+// Pre-fetch and cache player data on server startup
+export async function warmupCache(): Promise<void> {
+  console.log('[CSC] Warming up cache...');
+  try {
+    const players = await fetchAndCachePlayersWithStats();
+    console.log(`[CSC] Cache warmed up with ${players.length} players`);
+  } catch (error) {
+    console.error('[CSC] Failed to warm up cache:', error);
+  }
+}
+
+// Refresh cache periodically (call this from a scheduler if needed)
+export async function refreshCache(): Promise<void> {
+  console.log('[CSC] Refreshing cache...');
+  try {
+    await fetchAndCachePlayersWithStats();
+  } catch (error) {
+    console.error('[CSC] Failed to refresh cache:', error);
+  }
 }

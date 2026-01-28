@@ -12,6 +12,7 @@ import usersRoutes from './routes/users';
 import playersRoutes from './routes/players';
 import packCodesRoutes from './routes/packCodes';
 import giftsRoutes from './routes/gifts';
+import { warmupCache, refreshCache, CACHE_DURATION } from './services/csc';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,6 +51,12 @@ async function start() {
   try {
     await initializeDatabase();
     console.log('Database initialized');
+
+    // Pre-fetch player data before accepting requests
+    await warmupCache();
+    
+    // Refresh cache periodically
+    setInterval(() => refreshCache(), CACHE_DURATION);
 
     app.listen(PORT, () => {
       console.log(`🚀 CSC Trading Card API running on port ${PORT}`);
