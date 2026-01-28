@@ -14,8 +14,8 @@ const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
 let cachedSeason: SeasonConfig | null = null;
 let seasonCacheTime = 0;
 
-let cachedPlayers: CscPlayer[] | null = null;
-let playersCacheTime = 0;
+// Cache player details by name for quick lookup
+let cachedPlayerDetails: Map<string, CscPlayer> = new Map();
 
 let cachedStats: Map<string, PlayerStats> | null = null;
 let statsCacheTime = 0;
@@ -37,11 +37,24 @@ export async function fetchCurrentSeason(): Promise<SeasonConfig> {
   return data;
 }
 
-export async function fetchPlayers(): Promise<CscPlayer[]> {
-  const now = Date.now();
-  if (cachedPlayers && now - playersCacheTime < CACHE_DURATION) {
-    return cachedPlayers;
+// Fetch player details only for specific names (used for pack opening)
+export async function fetchPlayersByNames(names: string[]): Promise<Map<string, CscPlayer>> {
+  if (names.length === 0) return new Map();
+  
+  // Check which names we already have cached
+  const uncachedNames = names.filter(name => !cachedPlayerDetails.has(name));
+  
+  if (uncachedNames.length === 0) {
+    // All names are cached, return from cache
+    const result = new Map<string, CscPlayer>();
+    names.forEach(name => {
+      const player = cachedPlayerDetails.get(name);
+      if (player) result.set(name, player);
+    });
+    return result;
   }
+  
+  // Fetch all players and cache them (CSC Core API doesn't support filtering by name)
   const response = await fetch(CSC_CORE_GRAPHQL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -73,9 +86,23 @@ export async function fetchPlayers(): Promise<CscPlayer[]> {
 
   const json = (await response.json()) as { data?: { players?: CscPlayer[] } };
   const players = json.data?.players ?? [];
-  cachedPlayers = players;
-  playersCacheTime = now;
-  return players;
+  
+  // Cache all fetched players
+  players.forEach(player => {
+    if (player.name) {
+      cachedPlayerDetails.set(player.name, player);
+    }
+  });
+  
+  // Return only requested names
+  const result = new Map<string, CscPlayer>();
+  names.forEach(name => {
+    const player = cachedPlayerDetails.get(name);
+    if (player) result.set(name, player);
+  });
+  
+  console.log(`[CSC] Fetched player details, cached ${cachedPlayerDetails.size} total, returning ${result.size} requested`);
+  return result;
 }
 
 export async function fetchTierStats(
@@ -149,15 +176,12 @@ export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
     return cachedPlayersWithStats;
   }
 
-  const [players, seasonConfig] = await Promise.all([
-    fetchPlayers(),
-    fetchCurrentSeason(),
-  ]);
-
+  // Step 1: Get season config and stats FIRST (this tells us who has played)
+  const seasonConfig = await fetchCurrentSeason();
   const matchType = seasonConfig.hasSeasonStarted ? 'Regulation' : 'Combine';
   let statsMap = await fetchAllStats(seasonConfig.number, matchType);
 
-  console.log(`[CSC] Season ${seasonConfig.number}, matchType: ${matchType}, players: ${players.length}, stats entries: ${statsMap.size}`);
+  console.log(`[CSC] Season ${seasonConfig.number}, matchType: ${matchType}, stats entries: ${statsMap.size}`);
 
   // Fall back to Combine stats if Regulation has no stats
   if (statsMap.size === 0 && matchType === 'Regulation') {
@@ -166,20 +190,40 @@ export async function fetchPlayersWithStats(): Promise<PlayerWithStats[]> {
     console.log(`[CSC] Combine stats entries: ${statsMap.size}`);
   }
 
-  const result = players
-    .filter((player) => player.tier?.name)
-    .map((player) => ({
-      ...player,
-      stats: statsMap.get(player.name),
-    }));
+  // Step 2: Get player names who have stats (only these matter for pack opening)
+  const playerNamesWithStats = Array.from(statsMap.keys());
+  
+  if (playerNamesWithStats.length === 0) {
+    console.log(`[CSC] No players with stats found`);
+    return cachedPlayersWithStats || [];
+  }
 
-  const withStats = result.filter(p => p.stats && p.stats.gameCount > 0);
-  console.log(`[CSC] Players with tier: ${result.length}, with stats & games: ${withStats.length}`);
+  // Step 3: Fetch player details ONLY for those with stats
+  const playerDetailsMap = await fetchPlayersByNames(playerNamesWithStats);
 
-  // Only cache if we got good results
-  if (withStats.length >= 600) {
+  // Step 4: Combine player details with stats
+  const result: PlayerWithStats[] = [];
+  for (const [name, stats] of statsMap.entries()) {
+    const player = playerDetailsMap.get(name);
+    if (player && player.tier?.name && stats.gameCount > 0) {
+      result.push({
+        ...player,
+        stats,
+      });
+    }
+  }
+
+  console.log(`[CSC] Players with stats & details: ${result.length}`);
+
+  // Cache if we got good results, or if better than current cache
+  const currentCacheSize = cachedPlayersWithStats?.length || 0;
+  if (result.length >= 600 || result.length > currentCacheSize) {
     cachedPlayersWithStats = result;
     playersWithStatsCacheTime = now;
+    console.log(`[CSC] Cached ${result.length} players with stats`);
+  } else if (cachedPlayersWithStats) {
+    console.log(`[CSC] Keeping existing cache (${currentCacheSize}) over new result (${result.length})`);
+    return cachedPlayersWithStats;
   }
 
   return result;

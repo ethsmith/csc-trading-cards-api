@@ -30,8 +30,8 @@ async function findOrCreateSnapshot(
   try {
     const existing = await conn.query(
       `SELECT * FROM card_snapshots 
-       WHERE csc_player_id = ? AND season = ? AND stat_type = ? AND avatar_url = ?`,
-      [player.id, season, statType, player.avatarUrl]
+       WHERE csc_player_id = ? AND season = ? AND stat_type = ? AND avatar_url = ? AND player_name = ?`,
+      [player.id, season, statType, player.avatarUrl, player.name]
     );
 
     if (existing.rows.length > 0) {
