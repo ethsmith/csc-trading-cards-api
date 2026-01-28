@@ -174,6 +174,31 @@ export class MySQLAdapter implements DatabaseAdapter {
         )
       `);
 
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS changelogs (
+          id VARCHAR(36) PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          content TEXT NOT NULL,
+          version VARCHAR(50),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_changelogs_created (created_at)
+        )
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS changelog_reads (
+          id VARCHAR(36) PRIMARY KEY,
+          changelog_id VARCHAR(36) NOT NULL,
+          discord_user_id VARCHAR(32) NOT NULL,
+          read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (changelog_id) REFERENCES changelogs(id) ON DELETE CASCADE,
+          FOREIGN KEY (discord_user_id) REFERENCES users(discord_id) ON DELETE CASCADE,
+          UNIQUE KEY unique_read (changelog_id, discord_user_id),
+          INDEX idx_changelog_reads_user (discord_user_id),
+          INDEX idx_changelog_reads_changelog (changelog_id)
+        )
+      `);
+
       console.log('MySQL tables initialized successfully');
     } finally {
       connection.release();

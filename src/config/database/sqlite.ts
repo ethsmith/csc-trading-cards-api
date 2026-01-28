@@ -254,6 +254,40 @@ export class SQLiteAdapter implements DatabaseAdapter {
       CREATE INDEX IF NOT EXISTS idx_gifts_claimed ON gifts(claimed_at)
     `);
 
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS changelogs (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        version TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_changelogs_created ON changelogs(created_at)
+    `);
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS changelog_reads (
+        id TEXT PRIMARY KEY,
+        changelog_id TEXT NOT NULL,
+        discord_user_id TEXT NOT NULL,
+        read_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (changelog_id) REFERENCES changelogs(id) ON DELETE CASCADE,
+        FOREIGN KEY (discord_user_id) REFERENCES users(discord_id) ON DELETE CASCADE,
+        UNIQUE (changelog_id, discord_user_id)
+      )
+    `);
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_changelog_reads_user ON changelog_reads(discord_user_id)
+    `);
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_changelog_reads_changelog ON changelog_reads(changelog_id)
+    `);
+
     console.log('SQLite tables initialized successfully');
   }
 

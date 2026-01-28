@@ -258,6 +258,38 @@ export class PostgresAdapter implements DatabaseAdapter {
         CREATE INDEX IF NOT EXISTS idx_gifts_claimed ON gifts(claimed_at)
       `);
 
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS changelogs (
+          id VARCHAR(36) PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          content TEXT NOT NULL,
+          version VARCHAR(50),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_changelogs_created ON changelogs(created_at)
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS changelog_reads (
+          id VARCHAR(36) PRIMARY KEY,
+          changelog_id VARCHAR(36) NOT NULL REFERENCES changelogs(id) ON DELETE CASCADE,
+          discord_user_id VARCHAR(32) NOT NULL REFERENCES users(discord_id) ON DELETE CASCADE,
+          read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (changelog_id, discord_user_id)
+        )
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_changelog_reads_user ON changelog_reads(discord_user_id)
+      `);
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_changelog_reads_changelog ON changelog_reads(changelog_id)
+      `);
+
       console.log('PostgreSQL tables initialized successfully');
     } finally {
       client.release();

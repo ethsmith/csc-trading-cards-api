@@ -12,6 +12,7 @@ import usersRoutes from './routes/users';
 import playersRoutes from './routes/players';
 import packCodesRoutes from './routes/packCodes';
 import giftsRoutes from './routes/gifts';
+import changelogsRoutes from './routes/changelogs';
 import { warmupCache, refreshCache, CACHE_DURATION } from './services/csc';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/users', usersRoutes);
 app.use('/players', playersRoutes);
 app.use('/codes', packCodesRoutes);
 app.use('/gifts', giftsRoutes);
+app.use('/changelogs', changelogsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
