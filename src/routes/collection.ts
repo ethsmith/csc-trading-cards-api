@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { getUserCollection, getCollectionStats, openPack, getCardById } from '../services/cards';
+import { getUserCollection, getCollectionStats, openPack, getCardById, searchCardOwners } from '../services/cards';
+import type { CardRarity } from '../types';
 
 const router = Router();
 
@@ -62,6 +63,30 @@ router.get('/user/:discordId', authenticateToken, async (req: Request, res: Resp
   } catch (error) {
     console.error('Error fetching user collection:', error);
     res.status(500).json({ error: 'Failed to fetch user collection' });
+  }
+});
+
+router.get('/search', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { playerName, rarity } = req.query;
+
+    if (!playerName || typeof playerName !== 'string' || playerName.trim().length < 2) {
+      res.status(400).json({ error: 'playerName query parameter is required (min 2 characters)' });
+      return;
+    }
+
+    const validRarities = ['normal', 'foil', 'holo', 'gold', 'prismatic'];
+    const rarityFilter = rarity && typeof rarity === 'string' && validRarities.includes(rarity)
+      ? rarity as CardRarity
+      : undefined;
+
+    // Exclude the current user from search results
+    const result = await searchCardOwners(playerName.trim(), rarityFilter, req.user!.discordId);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error searching card owners:', error);
+    res.status(500).json({ error: 'Failed to search card owners' });
   }
 });
 

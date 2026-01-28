@@ -355,6 +355,61 @@ export async function tradeInDuplicates(
   }
 }
 
+export async function searchCardOwners(
+  playerName: string,
+  rarity?: CardRarity,
+  excludeUserId?: string
+): Promise<{
+  owners: Array<{
+    discordUserId: string;
+    username: string;
+    avatar: string | null;
+    cardCount: number;
+  }>;
+  totalOwners: number;
+}> {
+  const db = getDatabase();
+  
+  let query = `
+    SELECT 
+      u.discord_id,
+      u.username,
+      u.avatar,
+      COUNT(oc.id) as card_count
+    FROM owned_cards oc
+    JOIN card_snapshots cs ON oc.card_snapshot_id = cs.id
+    JOIN users u ON oc.discord_user_id = u.discord_id
+    WHERE cs.player_name LIKE ?
+  `;
+  const params: (string | undefined)[] = [`%${playerName}%`];
+
+  if (rarity) {
+    query += ` AND oc.rarity = ?`;
+    params.push(rarity);
+  }
+
+  if (excludeUserId) {
+    query += ` AND u.discord_id != ?`;
+    params.push(excludeUserId);
+  }
+
+  query += ` GROUP BY u.discord_id, u.username, u.avatar ORDER BY card_count DESC`;
+
+  const result = await db.query(query, params);
+
+  const owners = result.rows.map((row: any) => ({
+    discordUserId: row.discord_id,
+    username: row.username,
+    avatar: row.avatar,
+    cardCount: parseInt(row.card_count),
+  }));
+
+  return {
+    owners,
+    totalOwners: owners.length,
+  };
+}
+
 export async function getCollectionStats(discordUserId: string) {
   const db = getDatabase();
   
