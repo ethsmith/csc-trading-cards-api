@@ -51,7 +51,7 @@ router.post('/open', authenticateToken, async (req: Request, res: Response) => {
 router.post('/trade-in', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { cardIds } = req.body;
-    const requiredCount = 15;
+    const requiredCount = 30;
 
     if (!Array.isArray(cardIds)) {
       res.status(400).json({ error: 'cardIds must be an array' });
