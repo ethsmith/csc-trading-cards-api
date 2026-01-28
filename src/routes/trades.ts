@@ -66,6 +66,28 @@ router.get('/pending', authenticateToken, async (req: Request, res: Response) =>
   }
 });
 
+router.get('/history', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const type = req.query.type as 'incoming' | 'outgoing' | 'all' | undefined;
+    const status = req.query.status as 'accepted' | 'rejected' | 'cancelled' | undefined;
+    
+    const trades = await getUserTradeOffers(req.user!.discordId, type || 'all');
+    
+    // Filter to only completed trades (not pending)
+    let history = trades.filter((t) => t.status !== 'pending');
+    
+    // Optionally filter by specific status
+    if (status) {
+      history = history.filter((t) => t.status === status);
+    }
+    
+    res.json({ trades: history });
+  } catch (error) {
+    console.error('Error fetching trade history:', error);
+    res.status(500).json({ error: 'Failed to fetch trade history' });
+  }
+});
+
 router.get('/:tradeId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const trade = await getTradeOfferById(req.params.tradeId);
