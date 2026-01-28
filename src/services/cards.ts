@@ -286,6 +286,75 @@ export async function getCardById(cardId: string): Promise<OwnedCard | null> {
   };
 }
 
+export async function tradeInDuplicates(
+  discordUserId: string,
+  cardIds: string[],
+  requiredCount: number = 15
+): Promise<void> {
+  if (cardIds.length !== requiredCount) {
+    throw new Error(`Must trade in exactly ${requiredCount} cards`);
+  }
+
+  // Check for duplicate card IDs in the request
+  const uniqueCardIds = new Set(cardIds);
+  if (uniqueCardIds.size !== cardIds.length) {
+    throw new Error('Cannot trade in the same card multiple times');
+  }
+
+  const db = getDatabase();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // Verify ownership and check that user has duplicates of each card
+    for (const cardId of cardIds) {
+      // Get the card being traded
+      const cardResult = await connection.query(
+        `SELECT oc.id, oc.card_snapshot_id, oc.rarity, oc.discord_user_id
+         FROM owned_cards oc
+         WHERE oc.id = ?`,
+        [cardId]
+      );
+
+      if (cardResult.rows.length === 0) {
+        throw new Error(`Card ${cardId} not found`);
+      }
+
+      const card = cardResult.rows[0];
+      if (card.discord_user_id !== discordUserId) {
+        throw new Error(`Card ${cardId} does not belong to you`);
+      }
+
+      // Check that user has more than 1 of this exact card (same snapshot + rarity)
+      const duplicateCount = await connection.query(
+        `SELECT COUNT(*) as count FROM owned_cards 
+         WHERE discord_user_id = ? AND card_snapshot_id = ? AND rarity = ?`,
+        [discordUserId, card.card_snapshot_id, card.rarity]
+      );
+
+      if (parseInt(duplicateCount.rows[0].count) <= 1) {
+        throw new Error(`You must have more than one copy of each card you trade in`);
+      }
+    }
+
+    // Delete the traded cards
+    for (const cardId of cardIds) {
+      await connection.query(
+        'DELETE FROM owned_cards WHERE id = ? AND discord_user_id = ?',
+        [cardId, discordUserId]
+      );
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 export async function getCollectionStats(discordUserId: string) {
   const db = getDatabase();
   

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { openPack } from '../services/cards';
-import { getPackBalance, decrementPackBalance } from '../services/users';
+import { openPack, tradeInDuplicates } from '../services/cards';
+import { getPackBalance, decrementPackBalance, addPacks } from '../services/users';
 
 const router = Router();
 
@@ -45,6 +45,44 @@ router.post('/open', authenticateToken, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error opening pack:', error);
     res.status(500).json({ error: 'Failed to open pack' });
+  }
+});
+
+router.post('/trade-in', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { cardIds } = req.body;
+    const requiredCount = 15;
+
+    if (!Array.isArray(cardIds)) {
+      res.status(400).json({ error: 'cardIds must be an array' });
+      return;
+    }
+
+    if (cardIds.length !== requiredCount) {
+      res.status(400).json({ error: `Must trade in exactly ${requiredCount} duplicate cards` });
+      return;
+    }
+
+    await tradeInDuplicates(req.user!.discordId, cardIds, requiredCount);
+
+    // Add 1 pack to user's balance instead of opening immediately
+    const newBalance = await addPacks(req.user!.discordId, 1);
+
+    res.json({
+      packBalance: newBalance,
+      message: `Successfully traded in ${requiredCount} cards for a pack!`,
+    });
+  } catch (error: any) {
+    console.error('Error trading in cards:', error);
+    if (error.message?.includes('must have more than one') || 
+        error.message?.includes('not found') || 
+        error.message?.includes('does not belong') ||
+        error.message?.includes('Must trade in exactly') ||
+        error.message?.includes('Cannot trade in the same card')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to trade in cards' });
   }
 });
 
