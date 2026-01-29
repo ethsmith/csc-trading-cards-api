@@ -199,6 +199,17 @@ export class MySQLAdapter implements DatabaseAdapter {
         )
       `);
 
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS pack_opens (
+          id VARCHAR(36) PRIMARY KEY,
+          discord_user_id VARCHAR(32) NOT NULL,
+          cards_opened INT NOT NULL,
+          opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (discord_user_id) REFERENCES users(discord_id) ON DELETE CASCADE,
+          INDEX idx_pack_opens_user (discord_user_id)
+        )
+      `);
+
       console.log('MySQL tables initialized successfully');
     } finally {
       connection.release();

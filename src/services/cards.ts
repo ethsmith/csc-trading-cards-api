@@ -178,6 +178,13 @@ export async function openPack(
       }
     }
 
+    // Log the pack open
+    const packOpenId = uuidv4();
+    await connection.query(
+      `INSERT INTO pack_opens (id, discord_user_id, cards_opened) VALUES (?, ?, ?)`,
+      [packOpenId, discordUserId, packSize]
+    );
+
     await connection.commit();
     return { cards, newSnapshots };
   } catch (error) {
