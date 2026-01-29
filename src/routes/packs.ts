@@ -17,10 +17,10 @@ router.get('/balance', authenticateToken, async (req: Request, res: Response) =>
 
 router.post('/open', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const packSize = req.body.packSize || 5;
+    const packSize = 5;
     
-    if (packSize < 1 || packSize > 10) {
-      res.status(400).json({ error: 'Pack size must be between 1 and 10' });
+    if (packSize < 1 || packSize > 5) {
+      res.status(400).json({ error: 'Pack size must be between 1 and 5' });
       return;
     }
 
