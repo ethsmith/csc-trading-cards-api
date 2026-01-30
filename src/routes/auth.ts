@@ -10,7 +10,7 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || '';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 router.get('/discord', (req: Request, res: Response) => {
   const params = new URLSearchParams({

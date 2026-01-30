@@ -48,9 +48,17 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Validate required environment variables
+function validateEnv() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+}
+
 // Start server
 async function start() {
   try {
+    validateEnv();
     await initializeDatabase();
     console.log('Database initialized');
 

@@ -20,7 +20,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as AuthenticatedUser;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthenticatedUser;
     req.user = decoded;
     next();
   } catch (err) {
@@ -34,7 +34,7 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as AuthenticatedUser;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthenticatedUser;
       req.user = decoded;
     } catch {
       // Token invalid, but that's okay for optional auth
@@ -56,7 +56,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as AuthenticatedUser;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthenticatedUser;
     req.user = decoded;
 
     if (!ADMIN_DISCORD_IDS.includes(decoded.discordId)) {
